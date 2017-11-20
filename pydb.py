@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import socket
 import sys
+import argparse
 
 class DBServer:
   """Class for database server objects
@@ -30,13 +31,13 @@ class DBServer:
     self.server_socket.listen(self.request_queue_size)
 
     print 'Serving HTTP on port %s ...' % server_port
-  
+
   def serve_requests(self):
     server_socket = self.server_socket
-    
+
     #loop to listen for client connections and direct them to the handler
     while True:
-      #create the client connection 
+      #create the client connection
       client_connection, client_address = server_socket.accept()
       #call the request handler for the request and then close it and loop back and wait for another
       self.request_handler(client_connection)
@@ -62,7 +63,7 @@ class DBServer:
     #split path into it's components
     request_op, request_keyvalue = path.split('?')
     request_op = request_op[1:]
-    
+
     #handle request appropriately depending on operation requested
     if request_op == 'get':
       request_value, request_key = request_keyvalue.split('=')
@@ -72,7 +73,7 @@ class DBServer:
       response = self.set_value(request_key, request_value)
     else:
       print('Error: unknown operation in URL. Must be either GET or SET.')
- 
+
     #print('Request path is %s so op is %s and key is %s' % (path, request_op, request_key))
     return response
 
@@ -91,7 +92,7 @@ class DBServer:
     print('Setting value of %s to %s' % (request_key, request_value))
     response = 'Key ' + request_key + ' has been set to ' + request_value
     return response
-  
+
   def send_response(self, client_connection, response):
     http_response = "HTTP/1.1 200 OK\n\n" + response
     client_connection.sendall(http_response)
@@ -103,11 +104,15 @@ def make_dbserver(server_address, server_port):
   server = DBServer(server_address, server_port)
   return server
 
+def parse_args():
+    """Parse some arguments"""
+    parser = argparse.ArgumentParser(description='Create a database server to save and return key pair values')
+    parser.add_argument('--ip', type=str, required=False, default='localhost', help='IP for server to listen on')
+    parser.add_argument('--port', type=int, required=False, default=4000, help='Port for server to listen on')
+    return parser.parse_args()
+
 #define _main_
 if __name__ == '__main__':
-  if len(sys.argv) < 3:
-    sys.exit('Must provide an address and port to listen on')
-  server_address = sys.argv[1]
-  server_port = int(sys.argv[2])
-  httpd = make_dbserver(server_address, server_port)
+  args = parse_args()
+  httpd = make_dbserver(args.ip, args.port)
   httpd.serve_requests()
