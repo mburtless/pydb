@@ -1,6 +1,5 @@
 #!/usr/bin/python
 import socket
-import sys
 import argparse
 
 class DBServer:
@@ -58,24 +57,25 @@ class DBServer:
         return response
 
     try:
-        #split path into it's components, the operation requested and the keyvalue
+        #split path into it's components: the operation requested and the keyvalue
         request_op, request_keyvalue = path.split('?')
         request_op = request_op[1:]
+
+        #If request is a get we split in a different order than if it's a set
+        if request_op == 'get':
+          request_value, request_key = request_keyvalue.split('=')
+          response = self.get_value(request_key)
+        elif request_op == 'set':
+          request_key, request_value = request_keyvalue.split('=')
+          response = self.set_value(request_key, request_value)
+        else:
+          #print('Error: unknown operation in URL. Must be either GET or SET.')
+          response = 'Error: unknown operation in URL. Must be either GET or SET.'
     except ValueError:
+        #Catch any paths requested that don't contain a '?' or an '='
         response = """Error: Incorrect path (%s)
         Requested URL must take the form http://%s:%s/[operation]?[value]""" % (path, self.server_address, self.server_port)
         return response
-
-    #handle request appropriately depending on operation requested
-    if request_op == 'get':
-      request_value, request_key = request_keyvalue.split('=')
-      response = self.get_value(request_key)
-    elif request_op == 'set':
-      request_key, request_value = request_keyvalue.split('=')
-      response = self.set_value(request_key, request_value)
-    else:
-      #print('Error: unknown operation in URL. Must be either GET or SET.')
-      response = 'Error: unknown operation in URL. Must be either GET or SET.'
 
     return response
 
@@ -102,7 +102,6 @@ class DBServer:
     http_response = "HTTP/1.1 200 OK\n\n" + response
     client_connection.sendall(http_response)
     client_connection.close()
-
 
 def make_dbserver(server_address, server_port):
   """Make an instance of DBServer on the passed IP and port"""
