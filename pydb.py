@@ -2,7 +2,6 @@
 import socket
 import argparse
 import datetime
-import signal
 from textwrap import dedent
 
 class DBServer:
