@@ -6,8 +6,19 @@ from textwrap import dedent
 
 class DBServer:
   """Class for database server objects
-  :param server_address: Address to bind the server socket to
-  :param server_port: Port to bind the server socket to
+
+  Binds a socket to a passed IP address or locahost string and port,
+  and either stores or retrieves key values passed via HTTP
+
+  Args:
+    server_address (str): Address to bind the server socket to
+    server_port (int): Port to bind the server socket to
+
+  Attributes:
+    server_address (str): Address to bind the server socket to
+    server_port (int): Port to bind the server socket to
+    key_value_db (dict): Dictionary used to store key value pairs
+    server_socket (socket): The socket created by the DBServer instance
   """
   address_family = socket.AF_INET
   socket_type = socket.SOCK_STREAM
@@ -17,7 +28,7 @@ class DBServer:
     self.server_port = server_port
     self.key_value_db = {}
 
-    #Create socket, bind it and listen
+    #Create a socket and try to bind to it
     self.server_socket = socket.socket(self.address_family, self.socket_type)
     self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
@@ -30,14 +41,19 @@ class DBServer:
     print 'Serving HTTP on %s:%s' % (server_address, server_port)
 
   def serve_requests(self):
-    """Main loop to listen for client connections and route to request_handler"""
+    """Infinite loop to listen for client connections and route to request_handler"""
     while True:
       self.server_socket.listen(self.request_queue_size)
       client_connection, client_address = self.server_socket.accept()
       self.request_handler(client_connection)
 
   def request_handler(self, client_connection):
-    """Accepts incoming connections, routes them to the parser and triggers a response"""
+    """Accepts incoming connections, routes them to the parser and sends
+    responses to send_response()
+
+    Args:
+      client_connection (socket): Socket used for the client's requests
+    """
     request = client_connection.recv(1024)
 
     #Make sure we recieved some data before proceeding
@@ -51,15 +67,24 @@ class DBServer:
     self.send_response(client_connection, response, http_code)
 
   def parse_request(self, request):
-    """Method to parse requests by path"""
+    """Method to parse requests by path, route them to the correct getter or
+    setter and return a response and HTTP status code
+
+    Args:
+      request(string): The data recieved from the client via the socket_type
+
+    Returns:
+      response(string): The text to display in the HTTP response
+      http_code(int): The HTTP status code to include in the response
+    """
     response=''
     http_code = 200
 
     request_line = request.splitlines()[0]
     request_method, path, request_version = request_line.split()
 
+    #Try to split path into it's components: the operation requested and the keyvalue
     try:
-        #split path into it's components: the operation requested and the keyvalue
         request_op, request_keyvalue = path.split('?')
         request_op = request_op[1:]
 
@@ -73,8 +98,8 @@ class DBServer:
         else:
           response = 'Unknown operation in URL. Must be either GET or SET.'
           http_code = 400
-    except ValueError:
-        #Catch any paths requested that don't contain a '?' or an '='
+
+    except ValueError: #Catch any paths that don't match the form we're interested in
         response = dedent("""Incorrect path (%s)
                    Requested URL must take the form http://%s:%s/[operation]?[value]""" % (path, self.server_address, self.server_port))
         http_code = 400
@@ -83,28 +108,53 @@ class DBServer:
     return response, http_code
 
   def get_value(self, request_key):
-    """Getter to retrieve value for a passed key from the DB"""
+    """Getter to retrieve value for a passed key from the DB
+
+    Args:
+      request_key(string): The key to get the corresponding value for
+
+    Returns:
+      result(string): The text to display in the HTTP response
+      http_code(int): The HTTP status code to include in the response
+    """
+
     if request_key in self.key_value_db:
       result = 'The value for <b>%s</b> is <b>%s</b>' % (request_key, self.key_value_db[request_key])
       http_code = 200
-      #print('Value for key %s is %s' % (request_key, self.key_value_db[request_key]))
     else:
       result = 'The requested key (<b>%s</b>) does not exist' % request_key
       http_code = 404
-      #print('Key %s has not been set' % request_key)
 
     return result, http_code
 
   def set_value(self, request_key, request_value):
-    """Setter to set the value for a passed key"""
+    """Setter to set the value for a passed key in the DB
+
+    Args:
+      request_key(string): The key to set the value of
+      request_value(string): The value to store
+
+    Returns:
+      response(string): The text to display in the HTTP response
+      http_code(int): The HTTP status code to include in the response
+    """
+
     self.key_value_db[request_key] = request_value
-    #print('Setting value of %s to %s' % (request_key, request_value))
     response = 'Stored the value <b>%s</b> for the key <b>%s</b>' % (request_key, request_value)
     http_code = 200
+
     return response, http_code
 
   def gen_headers(self, http_code):
-    """Generate HTTP headers from passed http code"""
+    """Generate HTTP headers from passed HTTP response code
+
+    Args:
+      http_code(int): The HTTP status code to include in the response
+
+    Returns:
+      http_headers: The headers to include in the HTTP response
+    """
+
     if http_code == 200:
       http_headers = "HTTP/1.1 200 OK\n"
     elif http_code == 400:
@@ -118,16 +168,28 @@ class DBServer:
                     Content-type: text/html; charset=UTF-8
                     Server: pydb.py
                     Connection: close\n\n""" % utc_datetime)
+
     return http_headers
 
   def gen_body(self, response, http_code):
-    """Generate HTML body from passed content"""
+    """Generate HTML body from passed test to display
+
+    Args:
+      response(string): The text to display in the HTTP response
+      http_code(int): The HTTP status code to include in the response
+
+    Returns:
+      html_body(string): The HTML body to include in the HTTP response
+    """
+
     #enclose the response in an html paragraph tag
     response = '<p class="lead">%s</p>' % response
+
     #If we are returning any sort of error, prepend response with appropriate header
     if http_code > 200:
         response = "<h1>Error: %d</h1>\n%s" % (http_code, response)
 
+    #Generate the rest of the HTML
     html_body = dedent("""\
     <!DOCTYPE html>
     <html>
