@@ -1,4 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python
+"""A simple DB to store and retrieve key value pairs via HTTP
+"""
+
 import socket
 import argparse
 import datetime
@@ -71,11 +74,11 @@ class DBServer:
     setter and return a response and HTTP status code
 
     Args:
-      request(string): The data recieved from the client via the socket_type
+      request (string): The data recieved from the client via the socket_type
 
     Returns:
-      response(string): The text to display in the HTTP response
-      http_code(int): The HTTP status code to include in the response
+      response (string): The text to display in the HTTP response
+      http_code (int): The HTTP status code to include in the response
     """
     response=''
     http_code = 200
@@ -111,11 +114,11 @@ class DBServer:
     """Getter to retrieve value for a passed key from the DB
 
     Args:
-      request_key(string): The key to get the corresponding value for
+      request_key (string): The key to get the corresponding value for
 
     Returns:
-      result(string): The text to display in the HTTP response
-      http_code(int): The HTTP status code to include in the response
+      result (string): The text to display in the HTTP response
+      http_code (int): The HTTP status code to include in the response
     """
 
     if request_key in self.key_value_db:
@@ -131,16 +134,16 @@ class DBServer:
     """Setter to set the value for a passed key in the DB
 
     Args:
-      request_key(string): The key to set the value of
-      request_value(string): The value to store
+      request_key (string): The key to set the value of
+      request_value (string): The value to store
 
     Returns:
-      response(string): The text to display in the HTTP response
-      http_code(int): The HTTP status code to include in the response
+      response (string): The text to display in the HTTP response
+      http_code (int): The HTTP status code to include in the response
     """
 
     self.key_value_db[request_key] = request_value
-    response = 'Stored the value <b>%s</b> for the key <b>%s</b>' % (request_key, request_value)
+    response = 'Stored the value <b>%s</b> for the key <b>%s</b>' % (request_value, request_key)
     http_code = 200
 
     return response, http_code
@@ -149,10 +152,10 @@ class DBServer:
     """Generate HTTP headers from passed HTTP response code
 
     Args:
-      http_code(int): The HTTP status code to include in the response
+      http_code (int): The HTTP status code to include in the response
 
     Returns:
-      http_headers: The headers to include in the HTTP response
+      http_headers (string): The headers to include in the HTTP response
     """
 
     if http_code == 200:
@@ -175,11 +178,11 @@ class DBServer:
     """Generate HTML body from passed test to display
 
     Args:
-      response(string): The text to display in the HTTP response
-      http_code(int): The HTTP status code to include in the response
+      response (string): The text to display in the HTTP response
+      http_code (int): The HTTP status code to include in the response
 
     Returns:
-      html_body(string): The HTML body to include in the HTTP response
+      html_body (string): The HTML body to include in the HTTP response
     """
 
     #enclose the response in an html paragraph tag
@@ -217,25 +220,46 @@ class DBServer:
     return html_body
 
   def send_response(self, client_connection, response, http_code):
-    """Method to send a response to the client and close the connection"""
+    """Sends a response to the client and closes the socket for this request
+
+    Args:
+      client_connection (socket): Socket used for the client's requests
+      response (string): The text to display in the HTTP response
+      http_code (int): The HTTP status code to include in the response
+    """
+
+    #Construct the http response by concat'ing the generated headers and body
     http_response = self.gen_headers(http_code) + self.gen_body(response, http_code)
-    #http_response = "HTTP/1.1 200 OK\n\n" + self.gen_body(response)
+
     client_connection.sendall(http_response)
     client_connection.close()
 
 def make_dbserver(server_address, server_port):
-  """Make an instance of DBServer on the passed IP and port"""
+  """Make an instance of DBServer on the passed IP and port
+
+  Args:
+    server_address (str): Address to bind the server socket to
+    server_port (int): Port to bind the server socket to
+
+  Returns:
+    server (DBServer): The instance of DBServer with a socket bound to the passed address and port
+  """
   server = DBServer(server_address, server_port)
+
   return server
 
 def parse_args():
-    """Parse some arguments"""
+    """Parse arguments passed at the command line
+
+    Returns:
+      parser.parse_args() (argparse.Namespace): The parsed set of arguments
+    """
     parser = argparse.ArgumentParser(description='Create a database server to save and return key pair values')
     parser.add_argument('--ip', type=str, required=False, default='localhost', help='IP for server to listen on')
     parser.add_argument('--port', type=int, required=False, default=4000, help='Port for server to listen on')
+
     return parser.parse_args()
 
-#define _main_
 if __name__ == '__main__':
   args = parse_args()
   httpd = make_dbserver(args.ip, args.port)
